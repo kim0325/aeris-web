@@ -531,25 +531,21 @@ export default {
       if (!ts) return NaN;
       if (typeof ts === 'number') return ts;
       const str = String(ts).trim();
-      // Si el backend envía fecha sin zona explícita (ej. "2026-11-26 16:41:29"), se interpreta como UTC
-      const hasTimezone = /(Z|[+-]\d{2}:?\d{2})$/i.test(str);
       const isoStr = str.includes('T') ? str : str.replace(' ', 'T');
-      const parsed = new Date(hasTimezone ? isoStr : `${isoStr}Z`).getTime();
-      return parsed;
+      return new Date(isoStr).getTime();
     },
     isSpaceOnline(space) {
       if (!space || !space.ultima_medicion?.fecha_hora_registro) {
         return false;
       }
       const rawTs = space.ultima_medicion.fecha_hora_registro;
-      const utcMs = this.parseServerTimestamp(rawTs);
-      const localMs = new Date(String(rawTs).replace(' ', 'T')).getTime();
+      const localMs = this.parseServerTimestamp(rawTs);
+      const utcMs = new Date(`${String(rawTs).trim().replace(' ', 'T')}Z`).getTime();
 
-      const diffUtc = Number.isNaN(utcMs) ? Infinity : Math.abs((this.currentTime - utcMs) / 1000);
       const diffLocal = Number.isNaN(localMs) ? Infinity : Math.abs((this.currentTime - localMs) / 1000);
+      const diffUtc = Number.isNaN(utcMs) ? Infinity : Math.abs((this.currentTime - utcMs) / 1000);
 
-      // Evalúa la diferencia mínima (soporta tanto registros antiguos en UTC como nuevos en America/Mexico_City)
-      return Math.min(diffUtc, diffLocal) < 45;
+      return Math.min(diffLocal, diffUtc) < 45;
     },
     syncUserSession() {
       const session = localStorage.getItem('iaq_session');
@@ -662,7 +658,10 @@ export default {
 
       try {
         const token = localStorage.getItem('iaq_token');
-        const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+        const config = {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          params: { _t: Date.now() },
+        };
 
         const [spacesRes, alertsRes, metricsRes, locRes] = await Promise.all([
           axios.get(`${API_BASE}/spaces`, config),
@@ -814,8 +813,11 @@ export default {
     async fetchSpaceHistory(spaceId) {
       try {
         const token = localStorage.getItem('iaq_token');
-        const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-        const res = await axios.get(`${API_BASE}/spaces/${spaceId}/history?limit=15`, config);
+        const config = {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          params: { limit: 15, _t: Date.now() },
+        };
+        const res = await axios.get(`${API_BASE}/spaces/${spaceId}/history`, config);
         if (res.data?.data?.data && res.data.data.data.length > 0) {
           this.recentMeasurements = res.data.data.data;
           this.renderChart(false);
