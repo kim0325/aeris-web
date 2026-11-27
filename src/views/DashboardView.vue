@@ -545,7 +545,7 @@ export default {
       const diffLocal = Number.isNaN(localMs) ? Infinity : Math.abs((this.currentTime - localMs) / 1000);
       const diffUtc = Number.isNaN(utcMs) ? Infinity : Math.abs((this.currentTime - utcMs) / 1000);
 
-      return Math.min(diffLocal, diffUtc) < 45;
+      return Math.min(diffLocal, diffUtc) < 300;
     },
     syncUserSession() {
       const session = localStorage.getItem('iaq_session');
@@ -820,6 +820,14 @@ export default {
         const res = await axios.get(`${API_BASE}/spaces/${spaceId}/history`, config);
         if (res.data?.data?.data && res.data.data.data.length > 0) {
           this.recentMeasurements = res.data.data.data;
+          const latest = this.recentMeasurements[0];
+          const idx = this.spaces.findIndex((s) => s.id === spaceId);
+          if (idx !== -1 && latest) {
+            this.spaces[idx].ultima_medicion = {
+              ...latest,
+              estado_fsm: latest.historial_estado?.estado || 'NORMAL',
+            };
+          }
           this.renderChart(false);
         }
       } catch (err) {
